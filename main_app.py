@@ -1,149 +1,159 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
+from groq import Groq  # Importamos la librería de Groq
 
 # --- Configuración General ---
-st.set_page_config(page_title="Plataforma Multisectorial de Datos", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Plataforma Multisectorial AI", layout="wide", page_icon="🤖")
 
-st.title("📊 Plataforma de Análisis de Datos Multisectorial")
+st.title("📊 Plataforma de Análisis con Asistente IA")
 st.markdown("""
-Esta herramienta detecta automáticamente el tipo de conjunto de datos cargado y genera un tablero de control específico.
-**Formatos soportados:** Energía Renovable, Monitoreo Ambiental, Agro Colombia.
+Sube tus datos (Energía, Ambiental, Agro) y obtén gráficos automáticos + **Análisis Inteligente con Llama 3**.
 """)
 
-# --- Funciones de Análisis por Sector ---
-
+# --- Funciones de Visualización (Las mismas de antes) ---
 def analizar_energia(df):
     st.subheader("⚡ Dashboard de Energía Renovable")
-    
-    # Preprocesamiento
     if 'Fecha_Entrada_Operacion' in df.columns:
         df['Fecha_Entrada_Operacion'] = pd.to_datetime(df['Fecha_Entrada_Operacion'])
-
-    # Sidebar
-    st.sidebar.header("Filtros Energía")
-    operador = st.sidebar.multiselect("Operador", df['Operador'].unique(), default=df['Operador'].unique())
-    tecnologia = st.sidebar.multiselect("Tecnología", df['Tecnologia'].unique(), default=df['Tecnologia'].unique())
     
-    df_filtrado = df.query("Operador == @operador & Tecnologia == @tecnologia")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Proyectos", len(df))
+    c2.metric("Capacidad MW", f"{df['Capacidad_Instalada_MW'].sum():,.2f}")
+    c3.metric("Inversión MUSD", f"{df['Inversion_Inicial_MUSD'].sum():,.2f}")
     
-    # Métricas
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Proyectos", len(df_filtrado))
-    c2.metric("Capacidad Total (MW)", f"{df_filtrado['Capacidad_Instalada_MW'].sum():,.2f}")
-    c3.metric("Generación Diaria (MWh)", f"{df_filtrado['Generacion_Diaria_MWh'].sum():,.2f}")
-    c4.metric("Inversión (MUSD)", f"{df_filtrado['Inversion_Inicial_MUSD'].sum():,.2f}")
-
-    # Gráficos
-    col1, col2 = st.columns(2)
-    with col1:
-        fig = px.bar(df_filtrado, x='Tecnologia', y='Capacidad_Instalada_MW', color='Operador', 
-                     title="Capacidad Instalada por Tecnología y Operador")
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        fig = px.scatter(df_filtrado, x='Capacidad_Instalada_MW', y='Generacion_Diaria_MWh', 
-                         color='Tecnologia', size='Inversion_Inicial_MUSD',
-                         title="Eficiencia: Capacidad vs Generación (Tamaño = Inversión)")
-        st.plotly_chart(fig, use_container_width=True)
+    fig = px.bar(df, x='Tecnologia', y='Capacidad_Instalada_MW', color='Operador', title="Capacidad por Tecnología")
+    st.plotly_chart(fig, use_container_width=True)
 
 def analizar_ambiental(df):
     st.subheader("🍃 Dashboard de Monitoreo Ambiental")
-
-    # Sidebar
-    st.sidebar.header("Filtros Ambiental")
-    ciudad = st.sidebar.multiselect("Ciudad", df['Ciudad'].unique(), default=df['Ciudad'].unique())
-    tipo_zona = st.sidebar.multiselect("Zona", df['Tipo_Zona'].unique(), default=df['Tipo_Zona'].unique())
+    c1, c2 = st.columns(2)
+    c1.metric("Sensores", len(df))
+    c2.metric("Promedio PM2.5", f"{df['PM2_5_Ug_m3'].mean():.2f}")
     
-    df_filtrado = df.query("Ciudad == @ciudad & Tipo_Zona == @tipo_zona")
-
-    # Métricas
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Sensores Activos", len(df_filtrado))
-    c2.metric("Promedio PM2.5", f"{df_filtrado['PM2_5_Ug_m3'].mean():.2f} µg/m³")
-    c3.metric("Temp. Promedio", f"{df_filtrado['Temperatura_C'].mean():.1f} °C")
-
-    # Gráficos
-    col1, col2 = st.columns(2)
-    with col1:
-        # Boxplot para ver la dispersión de contaminación
-        fig = px.box(df_filtrado, x='Ciudad', y='PM2_5_Ug_m3', color='Tipo_Zona',
-                     title="Distribución de Material Particulado (PM2.5) por Ciudad")
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        # Heatmap de correlación simple o Scatter
-        fig = px.scatter(df_filtrado, x='Temperatura_C', y='Humedad_Relativa_Pct', 
-                         color='Indice_Calidad_Aire_ICA',
-                         title="Relación Temperatura vs Humedad (Color = Calidad Aire)")
-        st.plotly_chart(fig, use_container_width=True)
+    fig = px.box(df, x='Ciudad', y='PM2_5_Ug_m3', color='Tipo_Zona', title="Contaminación por Ciudad")
+    st.plotly_chart(fig, use_container_width=True)
 
 def analizar_agro(df):
-    st.subheader("🚜 Dashboard Agropecuario Colombia")
-
-    # Sidebar
-    st.sidebar.header("Filtros Agro")
-    departamento = st.sidebar.multiselect("Departamento", df['Departamento'].unique(), default=df['Departamento'].unique())
-    cultivo = st.sidebar.multiselect("Cultivo", df['Tipo_Cultivo'].unique(), default=df['Tipo_Cultivo'].unique())
+    st.subheader("🚜 Dashboard Agropecuario")
+    c1, c2 = st.columns(2)
+    c1.metric("Fincas", len(df))
+    c2.metric("Producción Ton", f"{df['Produccion_Anual_Ton'].sum():,.0f}")
     
-    df_filtrado = df.query("Departamento == @departamento & Tipo_Cultivo == @cultivo")
+    fig = px.sunburst(df, path=['Departamento', 'Tipo_Cultivo'], values='Produccion_Anual_Ton', title="Producción por Región")
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Métricas
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Fincas Auditadas", len(df_filtrado))
-    c2.metric("Área Total (Ha)", f"{df_filtrado['Area_Hectareas'].sum():,.0f}")
-    c3.metric("Producción Total (Ton)", f"{df_filtrado['Produccion_Anual_Ton'].sum():,.0f}")
+# --- FUNCIÓN: Generar Análisis con LLM ---
+def generar_analisis_ia(df, api_key, tipo_datos):
+    """
+    Envía un resumen estadístico de los datos a Groq para obtener insights.
+    """
+    try:
+        client = Groq(api_key=api_key)
+        
+        # Crear un resumen de los datos para no enviar todo el CSV (ahorro de tokens)
+        resumen_estadistico = df.describe().to_string()
+        muestra_datos = df.head(5).to_string()
+        columnas = list(df.columns)
+        
+        # Construcción del Prompt
+        prompt = f"""
+        Actúa como un Científico de Datos experto. Estás analizando un conjunto de datos de: {tipo_datos}.
+        
+        Aquí tienes un resumen de los datos:
+        1. Columnas disponibles: {columnas}
+        2. Muestra de las primeras 5 filas:
+        {muestra_datos}
+        3. Estadísticas descriptivas:
+        {resumen_estadistico}
 
-    # Gráficos
-    col1, col2 = st.columns(2)
-    with col1:
-        fig = px.sunburst(df_filtrado, path=['Departamento', 'Tipo_Cultivo'], values='Produccion_Anual_Ton',
-                          title="Distribución de Producción (Sunburst)")
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        fig = px.scatter(df_filtrado, x='Area_Hectareas', y='Produccion_Anual_Ton', 
-                         color='Nivel_Tecnificacion', hover_data=['Tipo_Suelo'],
-                         title="Productividad: Área vs Producción")
-        st.plotly_chart(fig, use_container_width=True)
+        TAREA:
+        Por favor, realiza un Análisis Exploratorio de Datos (EDA) textual breve.
+        1. Identifica posibles tendencias o anomalías visibles en las estadísticas.
+        2. Sugiere 3 preguntas de negocio que estos datos podrían responder.
+        3. Dame una conclusión general sobre la calidad o estado de los datos.
+        
+        Responde en formato Markdown, claro y conciso en Español.
+        """
+
+        with st.spinner('🤖 Llama 3 está analizando tus datos...'):
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                model="llama-3.3-70b-versatile",
+                temperature=0.5,
+                max_tokens=1024,
+            )
+            
+        return chat_completion.choices[0].message.content
+
+    except Exception as e:
+        return f"❌ Error al conectar con Groq: {str(e)}"
 
 # --- Main App Logic ---
 
-uploaded_file = st.sidebar.file_uploader("📂 Sube tu archivo CSV (Energía, Ambiental o Agro)", type=["csv"])
+# 1. Sidebar: Carga de archivo y API Key
+st.sidebar.header("Configuración")
+uploaded_file = st.sidebar.file_uploader("📂 Sube CSV (Energía, Ambiental, Agro)", type=["csv"])
+st.sidebar.markdown("---")
+groq_api_key = st.sidebar.text_input("🔑 Tu Groq API Key", type="password", help="Obtén tu key en console.groq.com")
 
 if uploaded_file is not None:
     try:
         df = pd.read_csv(uploaded_file)
         columns = set(df.columns)
         
-        # --- Lógica de Detección Automática ---
-        
-        # 1. Definir las firmas de columnas esperadas (sets para comparación rápida)
+        # Definición de huellas de columnas
         cols_energia = {'ID_Proyecto', 'Tecnologia', 'Capacidad_Instalada_MW'}
         cols_ambiental = {'ID_Sensor', 'PM2_5_Ug_m3', 'Indice_Calidad_Aire_ICA'}
         cols_agro = {'ID_Finca', 'Tipo_Cultivo', 'Produccion_Anual_Ton'}
 
-        # 2. Verificar intersección
+        tipo_detectado = ""
+        
+        # Detección y Visualización
         if cols_energia.issubset(columns):
-            st.success("✅ Archivo identificado: Datos de ENERGÍA RENOVABLE")
+            tipo_detectado = "Energía Renovable"
+            st.success(f"✅ Archivo identificado: {tipo_detectado}")
             analizar_energia(df)
             
         elif cols_ambiental.issubset(columns):
-            st.success("✅ Archivo identificado: Datos de MONITOREO AMBIENTAL")
+            tipo_detectado = "Monitoreo Ambiental"
+            st.success(f"✅ Archivo identificado: {tipo_detectado}")
             analizar_ambiental(df)
             
         elif cols_agro.issubset(columns):
-            st.success("✅ Archivo identificado: Datos del SECTOR AGROPECUARIO")
+            tipo_detectado = "Sector Agropecuario"
+            st.success(f"✅ Archivo identificado: {tipo_detectado}")
             analizar_agro(df)
             
         else:
-            st.error("⚠️ El archivo cargado no coincide con ninguno de los esquemas conocidos (Energía, Ambiental, Agro).")
-            st.write("Por favor verifica que las columnas sean correctas.")
-            with st.expander("Ver columnas detectadas"):
-                st.write(list(columns))
+            st.error("⚠️ Formato de archivo no reconocido.")
+            st.stop()
+
+        # --- SECCIÓN: Asistente de IA ---
+        st.markdown("---")
+        st.subheader("🤖 Asistente de Análisis Inteligente")
+        
+        if not groq_api_key:
+            st.warning("⚠️ Para usar el asistente IA, por favor ingresa tu API Key de Groq en la barra lateral.")
+        else:
+            col_ia_1, col_ia_2 = st.columns([1, 3])
+            
+            with col_ia_1:
+                st.info("El modelo analizará estadísticas descriptivas y una muestra de tus datos.")
+                if st.button("🧠 Generar Análisis con Llama 3", type="primary"):
+                    analisis = generar_analisis_ia(df, groq_api_key, tipo_detectado)
+                    st.session_state['analisis_resultado'] = analisis
+
+            with col_ia_2:
+                if 'analisis_resultado' in st.session_state:
+                    st.markdown(st.session_state['analisis_resultado'])
 
     except Exception as e:
         st.error(f"Error procesando el archivo: {e}")
 else:
-    st.info("👆 Esperando archivo. Por favor carga un CSV en la barra lateral.")
+    st.info("👆 Esperando archivo...")
